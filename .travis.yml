@@ -1,0 +1,9 @@
+language: go
+
+go:
+  - 1.11.x
+
+env:
+  - GO111MODULE=on ECS_CONTAINER_METADATA_URI=http://localhost:8080
+
+install: true
