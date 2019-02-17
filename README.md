@@ -19,6 +19,10 @@ Help Options:
 
 ```
 
+## Example
+
+See [example](example).
+
 ## Author
 
 Takeshi Arabiki (abicky)
