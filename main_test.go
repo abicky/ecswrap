@@ -46,7 +46,7 @@ func TestStart(t *testing.T) {
 	timeout := uint(3)
 
 	t.Run("it exits with status 0", func(t *testing.T) {
-		cp, err := start([]string{"sleep", "0"}, []string{"linked"}, timeout)
+		cp, err := start([]string{"sleep", "0"}, []string{"linked"}, timeout, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -73,7 +73,7 @@ func TestStart(t *testing.T) {
 	})
 
 	t.Run("it sends SIGUSR1 immediately", func(t *testing.T) {
-		cp, err := start([]string{"sleep", "10"}, []string{"linked"}, timeout)
+		cp, err := start([]string{"sleep", "10"}, []string{"linked"}, timeout, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -103,7 +103,7 @@ func TestStart(t *testing.T) {
 	})
 
 	t.Run("it sends SIGTERM after timeout", func(t *testing.T) {
-		cp, err := start([]string{"sleep", "10"}, []string{"linked"}, timeout)
+		cp, err := start([]string{"sleep", "10"}, []string{"linked"}, timeout, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -134,8 +134,41 @@ func TestStart(t *testing.T) {
 		exitStatus <- status
 	})
 
+	t.Run("it sends SIGTERM with signalForwardingDelay", func(t *testing.T) {
+		signalForwardingDelay := uint(2)
+		cp, err := start([]string{"sleep", "10"}, []string{"linked"}, timeout, signalForwardingDelay)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		exitStatus := make(chan int)
+		go func() {
+			process, _ := os.FindProcess(os.Getpid())
+			process.Signal(syscall.SIGTERM)
+			linkedContainer.KnownStatus = "STOPPED"
+
+			want := 128 + int(syscall.SIGTERM)
+			select {
+			case got := <-exitStatus:
+				if got != want {
+					t.Errorf("exitStatus: got: %v, want: %v", got, want)
+				}
+				return
+			case <-time.After(time.Duration(timeout+signalForwardingDelay+1) * time.Second):
+				t.Errorf("timeout")
+			}
+			close(exitStatus)
+		}()
+
+		status, err := cp.wait()
+		if err == nil {
+			t.Errorf("err is expected to be not nil")
+		}
+		exitStatus <- status
+	})
+
 	t.Run("it sends SIGTERM without timeout", func(t *testing.T) {
-		cp, err := start([]string{"sleep", "10"}, []string{"linked"}, timeout)
+		cp, err := start([]string{"sleep", "10"}, []string{"linked"}, timeout, 0)
 		if err != nil {
 			t.Fatal(err)
 		}

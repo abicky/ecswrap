@@ -15,9 +15,10 @@ import (
 )
 
 type options struct {
-	Timeout          uint     `long:"stop-wait-timeout" env:"ECSWRAP_STOP_WAIT_TIMEOUT" default:"10" description:"Maximum time duration in seconds to wait from when the process receives SIGTERM before sending SIGTERM to the child. This value should be less than ECS_CONTAINER_STOP_TIMEOUT."`
-	LinkedContainers []string `long:"linked-container" env:"ECSWRAP_LINKED_CONTAINERS" env-delim:"," description:"container names linked with the container where this program is running."`
-	Verbosity        []bool   `short:"v" long:"verbose" description:"Verbosity"`
+	Timeout               uint     `long:"stop-wait-timeout" env:"ECSWRAP_STOP_WAIT_TIMEOUT" default:"10" description:"Maximum time duration in seconds to wait from when the process receives SIGTERM before sending SIGTERM to the child. This value should be less than ECS_CONTAINER_STOP_TIMEOUT."`
+	LinkedContainers      []string `long:"linked-container" env:"ECSWRAP_LINKED_CONTAINERS" env-delim:"," description:"container names linked with the container where this program is running."`
+	SignalForwardingDelay uint     `long:"signal-forwarding-delay" env:"ECSWRAP_SIGNAL_FORWARDING_DELAY" default:"0" description:"Delay seconds until forwarding a signal, which is SIGTERM, SIGQUIT or SIGINT,to child processes."`
+	Verbosity             []bool   `short:"v" long:"verbose" description:"Verbosity"`
 }
 
 type childProcess struct {
@@ -70,7 +71,7 @@ func main() {
 	log.SetVerbosity(len(opts.Verbosity))
 
 	log.Debugf("opts: %+v, args: %v, PID: %v\n", opts, args, os.Getpid())
-	child, err := start(args, opts.LinkedContainers, opts.Timeout)
+	child, err := start(args, opts.LinkedContainers, opts.Timeout, opts.SignalForwardingDelay)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(defaultErrorExitStatus)
@@ -83,7 +84,7 @@ func main() {
 	os.Exit(exitCode)
 }
 
-func start(args []string, linkedContainers []string, timeout uint) (*childProcess, error) {
+func start(args []string, linkedContainers []string, timeout uint, signalForwardingDelay uint) (*childProcess, error) {
 	cmd := exec.Command(args[0], args[1:]...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -93,7 +94,7 @@ func start(args []string, linkedContainers []string, timeout uint) (*childProces
 	}
 	log.Debugf("Succeeded to start command %v with PID %d\n", args, cmd.Process.Pid)
 
-	go handleSignals(cmd.Process, linkedContainers, timeout)
+	go handleSignals(cmd.Process, linkedContainers, timeout, signalForwardingDelay)
 
 	return &childProcess{cmd: cmd}, nil
 }
@@ -123,7 +124,7 @@ func (cp *childProcess) wait() (int, error) {
 	return status, err
 }
 
-func handleSignals(process *os.Process, linkedContainers []string, timeout uint) {
+func handleSignals(process *os.Process, linkedContainers []string, timeout uint, signalForwardingDelay uint) {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, forwardableSignals...)
 
@@ -132,6 +133,9 @@ func handleSignals(process *os.Process, linkedContainers []string, timeout uint)
 		switch sig {
 		case syscall.SIGQUIT, syscall.SIGINT, syscall.SIGTERM:
 			waitContainers(linkedContainers, timeout)
+			if signalForwardingDelay > 0 {
+				time.Sleep(time.Duration(signalForwardingDelay) * time.Second)
+			}
 		}
 		log.Debugf("Send signal %d to child process\n", sig)
 		process.Signal(sig)
