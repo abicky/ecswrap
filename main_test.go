@@ -143,6 +143,8 @@ func TestStart(t *testing.T) {
 
 		exitStatus := make(chan int)
 		go func() {
+			defer close(exitStatus)
+
 			process, _ := os.FindProcess(os.Getpid())
 			process.Signal(syscall.SIGTERM)
 			linkedContainer.KnownStatus = "STOPPED"
@@ -157,7 +159,6 @@ func TestStart(t *testing.T) {
 			case <-time.After(time.Duration(timeout+signalForwardingDelay+1) * time.Second):
 				t.Errorf("timeout")
 			}
-			close(exitStatus)
 		}()
 
 		status, err := cp.wait()
