@@ -151,13 +151,14 @@ func TestStart(t *testing.T) {
 
 			want := 128 + int(syscall.SIGTERM)
 			select {
-			case got := <-exitStatus:
-				if got != want {
-					t.Errorf("exitStatus: got: %v, want: %v", got, want)
-				}
-				return
-			case <-time.After(time.Duration(timeout+signalForwardingDelay+1) * time.Second):
-				t.Errorf("timeout")
+			case <-exitStatus:
+				t.Errorf("not wait for signalForwardingDelay")
+			case <-time.After(time.Duration(float64(signalForwardingDelay)+0.5) * time.Second):
+			}
+
+			got := <-exitStatus
+			if got != want {
+				t.Errorf("exitStatus: got: %v, want: %v", got, want)
 			}
 		}()
 
