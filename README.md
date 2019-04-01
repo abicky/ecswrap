@@ -2,6 +2,10 @@
 
 `ecswrap` is a wrappper program for ECS containers and resolves termination order (cf. [amazon-ecs-agent#474](https://github.com/aws/amazon-ecs-agent/issues/474)) by specifying linked containers as a command line option or an environment variable.
 
+Enhanced container dependency management was introduced in ecs-agent 1.26.0, so you can use it instead of `ecswrap`.
+
+See [Amazon ECS Introduces Enhanced Container Dependency Management](https://aws.amazon.com/about-aws/whats-new/2019/03/amazon-ecs-introduces-enhanced-container-dependency-management/) for more details.
+
 ## Usage
 
 ```
